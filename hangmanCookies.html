@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover lets the page draw edge to edge on phones; the safe-area padding in :root keeps content clear of notches/system bars -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hangman</title>
+<!-- NOTE: the block below (Patrick Hand @font-face rules) was auto-injected by Cloudflare's font optimization, not hand-written. Left untouched. -->
+<style type="text/css">@font-face {font-family:'Patrick Hand';font-style:normal;font-weight:400;src:url(/cf-fonts/s/patrick-hand/5.2.8/latin/400/normal.woff2);unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;font-display:swap;}@font-face {font-family:'Patrick Hand';font-style:normal;font-weight:400;src:url(/cf-fonts/s/patrick-hand/5.2.8/latin-ext/400/normal.woff2);unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;font-display:swap;}@font-face {font-family:'Patrick Hand';font-style:normal;font-weight:400;src:url(/cf-fonts/s/patrick-hand/5.2.8/vietnamese/400/normal.woff2);unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;font-display:swap;}</style>
+<style>
+/* ---------- Theme colors ----------
+   All colors are CSS variables so light/dark themes only need to redefine these.
+   --bg: page background   --ink/--chalk: text and drawing color   --accent: focus ring & "Play again"
+   --key/--keyhov: letter button normal/hover   --ok/--bad: correct/wrong guess colors
+   The extra properties on :root keep content clear of phone notches and system bars. */
+:root{--bg:#f1efe8;--ink:#1d3a36;--chalk:#1d3a36;--accent:#b4572a;--key:#e2dfd3;--keyhov:#d3cfbf;--ok:#2f7d55;--bad:#a63d3d;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+/* Dark theme when the OS prefers dark, unless the host forces light via data-theme="light" */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10302c;--ink:#eef2e6;--chalk:#eef2e6;--accent:#f0c94d;--key:#1c4540;--keyhov:#27564f;--ok:#7fd1a0;--bad:#f08a7e}}
+/* Dark theme when the host forces it via data-theme="dark" */
+:root[data-theme="dark"]{--bg:#10302c;--ink:#eef2e6;--chalk:#eef2e6;--accent:#f0c94d;--key:#1c4540;--keyhov:#27564f;--ok:#7fd1a0;--bad:#f08a7e}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+
+/* ---------- Page layout ---------- */
+/* Body centers the game column; font falls back through handwriting-style fonts */
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Patrick Hand","Segoe Print","Comic Sans MS",cursive,sans-serif;font-size:20px;display:flex;justify-content:center}
+/* Narrow, centered column that works well on phones */
+main{width:100%;max-width:520px;padding:20px 16px 32px;text-align:center}
+h1{font-size:2.2rem;margin:0 0 4px;font-weight:400}
+/* min-height reserves space so the layout doesn't jump when the message changes */
+#status{min-height:1.6em;margin:4px 0 0}
+
+/* ---------- Hangman drawing ---------- */
+svg{width:200px;max-width:60%;height:auto;display:block;margin:8px auto}
+/* Every shape is drawn as a chalk-style outline with no fill */
+svg *{stroke:var(--chalk);stroke-width:4;stroke-linecap:round;fill:none}
+/* Body parts are hidden until a wrong guess adds the "on" class */
+.part{display:none}.part.on{display:inline}
+
+/* ---------- Word display ---------- */
+/* One underlined box per letter; wraps onto new lines for long words */
+#word{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:12px 0}
+#word span{width:1.4em;height:1.6em;border-bottom:3px solid var(--ink);font-size:1.7rem;line-height:1.6em}
+/* Letters revealed after losing (never guessed) are shown in red */
+#word span.miss{color:var(--bad)}
+
+/* ---------- On-screen keyboard ---------- */
+/* 7 columns x 4 rows fits the 26 letters */
+#keys{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:16px 0}
+#keys button{font:inherit;font-size:1.1rem;padding:8px 0;border:0;border-radius:6px;background:var(--key);color:var(--ink);cursor:pointer}
+#keys button:hover:not(:disabled){background:var(--keyhov)}
+/* Used keys are dimmed... */
+#keys button:disabled{cursor:default;opacity:.45}
+/* ...except hit/miss keys, which stay fully opaque and color-coded */
+#keys button.hit{background:var(--ok);color:var(--bg);opacity:1}
+#keys button.miss{background:var(--bad);color:var(--bg);opacity:1}
+/* Visible keyboard focus ring for accessibility */
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#again{font:inherit;font-size:1.1rem;padding:8px 22px;border:2px solid var(--accent);border-radius:6px;background:transparent;color:var(--accent);cursor:pointer}
+#hint{opacity:.75;margin:0}
+/* Streak and high score line */
+#score{margin:4px 0 0}
+</style>
+<!-- NOTE: the script below is Cloudflare's Zaraz analytics/tag-manager loader, auto-injected by the host, not part of the game. Left untouched. -->
+<script data-cfasync="false" nonce="1fc54d53-7222-4eb7-84bd-67a9dfef8820">try{(function(w,d){!function(kP,kQ,kR,kS){if(kP.zaraz)console.error("zaraz is loaded twice");else{kP[kR]=kP[kR]||{};kP[kR].executed=[];kP.zaraz={deferred:[],listeners:[]};kP.zaraz._v="20";kP.zaraz._n="1fc54d53-7222-4eb7-84bd-67a9dfef8820";kP.zaraz.q=[];kP.zaraz._f=function(kT){return async function(){var kU=Array.prototype.slice.call(arguments);kP.zaraz.q.push({m:kT,a:kU})}};for(const kV of["track","set","debug"])kP.zaraz[kV]=kP.zaraz._f(kV);kP.zaraz.init=()=>{var kW=kQ.getElementsByTagName(kS)[0],kX=kQ.createElement(kS),kY=kQ.getElementsByTagName("title")[0];kY&&(kP[kR].t=kQ.getElementsByTagName("title")[0].text);kP[kR].x=Math.random();kP[kR].w=kP.screen.width;kP[kR].h=kP.screen.height;kP[kR].j=kP.innerHeight;kP[kR].e=kP.innerWidth;kP[kR].l=kP.location.href;kP[kR].r=kQ.referrer;kP[kR].k=kP.screen.colorDepth;kP[kR].n=kQ.characterSet;kP[kR].o=(new Date).getTimezoneOffset();if(kP.dataLayer)for(const kZ of Object.entries(Object.entries(dataLayer).reduce((k$,la)=>({...k$[1],...la[1]}),{})))zaraz.set(kZ[0],kZ[1],{scope:"page"});kP[kR].q=[];for(;kP.zaraz.q.length;){const lb=kP.zaraz.q.shift();kP[kR].q.push(lb)}kX.defer=!0;for(const lc of[localStorage,sessionStorage])Object.keys(lc||{}).filter(le=>le.startsWith("_zaraz_")).forEach(ld=>{try{kP[kR]["z_"+ld.slice(7)]=JSON.parse(lc.getItem(ld))}catch{kP[kR]["z_"+ld.slice(7)]=lc.getItem(ld)}});kX.referrerPolicy="origin";kX.src="/cdn-cgi/zaraz/s.js?z="+btoa(encodeURIComponent(JSON.stringify(kP[kR])));kW.parentNode.insertBefore(kX,kW)};["complete","interactive"].includes(kQ.readyState)?zaraz.init():kP.addEventListener("DOMContentLoaded",zaraz.init)}}(w,d,"zarazData","script");window.zaraz._p=async kH=>new Promise(kI=>{if(kH){kH.e&&kH.e.forEach(kJ=>{try{const kK=d.querySelector("script[nonce]"),kL=kK?.nonce||kK?.getAttribute("nonce"),kM=d.createElement("script");kL&&(kM.nonce=kL);kM.innerHTML=kJ;kM.onload=()=>{d.head.removeChild(kM)};d.head.appendChild(kM)}catch(kN){console.error(`Error executing script: ${kJ}\n`,kN)}});Promise.allSettled((kH.f||[]).map(kO=>fetch(kO[0],kO[1])))}kI()});zaraz._p({"e":["(function(w,d){})(window,document)"]});})(window,document)}catch(e){throw fetch("/cdn-cgi/zaraz/t"),e;};</script></head>
+<body>
+<main>
+  <h1>Hangman</h1>
+  <button onclick="history.back()">Back to Home</button>
+  <!-- Clue for the current word, filled in by start() -->
+  <p id="hint"></p>
+  <!-- Current win streak and saved high score, filled in by showScore() -->
+  <p id="score"></p>
+  <!-- Gallows + figure. The gallows is always visible; the six body parts appear one per wrong guess -->
+  <svg viewBox="0 0 200 220" aria-label="Hangman drawing" role="img">
+    <!-- Gallows: base, upright post, top beam, and the rope -->
+    <path d="M20 210H110M50 210V20H140V45"/>
+    <!-- Body parts, in the order they appear: head, torso, left arm, right arm, left leg, right leg -->
+    <g id="parts">
+      <circle class="part" cx="140" cy="65" r="20"/>
+      <path class="part" d="M140 85V140"/>
+      <path class="part" d="M140 100L115 125"/>
+      <path class="part" d="M140 100L165 125"/>
+      <path class="part" d="M140 140L118 175"/>
+      <path class="part" d="M140 140L162 175"/>
+    </g>
+  </svg>
+  <!-- Feedback messages; aria-live makes screen readers announce changes -->
+  <p id="status" aria-live="polite"></p>
+  <!-- Blanks / revealed letters of the secret word -->
+  <div id="word" aria-label="Word to guess"></div>
+  <!-- A-Z buttons are generated by the script below -->
+  <div id="keys"></div>
+  <!-- Shown only when a game ends -->
+  <button id="again" hidden>Play again</button>
+</main>
+<script>
+// Word bank: each entry is [WORD IN CAPS, hint shown to the player]
+const WORDS=[["JAVASCRIPT","a programming language"],["KEYBOARD","you're using one"],["PLANET","orbits a star"],["GUITAR","six strings"],["MOUNTAIN","tall and rocky"],["LIBRARY","full of books"],["BICYCLE","two wheels"],["RAINBOW","after the storm"],["PUZZLE","fits together"],["COFFEE","morning drink"],["ELEPHANT","big animal with a trunk"],["VOLCANO","can erupt"]];
+
+// Number of wrong guesses allowed (matches the 6 body parts in the SVG)
+const MAX=6;
+
+// Game state:
+//   word    - the secret word for this round
+//   hint    - its clue
+//   guessed - Set of letters tried so far (right or wrong)
+//   wrong   - count of incorrect guesses
+//   over    - true once the round has been won or lost
+let word,hint,guessed,wrong,over;
+
+// Shorthand for document.getElementById
+const $=id=>document.getElementById(id);
+const keys=$("keys");
+
+// ---------- High score (stored in a cookie) ----------
+// Read a cookie by name; returns null if it isn't set (or cookies are blocked)
+function getCookie(name){
+  const m=document.cookie.match(new RegExp("(?:^|; )"+name+"=([^;]*)"));
+  return m?decodeURIComponent(m[1]):null;
+}
+// Write a cookie that lasts one year (31536000 seconds) and applies to the whole site
+function setCookie(name,value){
+  document.cookie=name+"="+encodeURIComponent(value)+"; max-age=31536000; path=/; SameSite=Lax";
+}
+
+// Score state:
+//   streak - consecutive words guessed this session (a loss resets it to 0)
+//   best   - the saved high score: your best streak ever, loaded from the cookie
+let streak=0;
+let best=parseInt(getCookie("hangmanHighScore"),10)||0;
+
+// Update the score line on screen
+function showScore(){
+  $("score").textContent="Streak: "+streak+"  ·  High score: "+best;
+}
+
+// Build the on-screen keyboard: one button per letter, stored in data-k for lookup
+for(const c of "ABCDEFGHIJKLMNOPQRSTUVWXYZ"){
+  const b=document.createElement("button");
+  b.textContent=c;b.dataset.k=c;b.onclick=()=>guess(c);keys.appendChild(b);
+}
+
+// Begin a new round: pick a random word and reset all state and UI
+function start(){
+  // Destructure the random [word, hint] pair into the two variables
+  [word,hint]=WORDS[Math.floor(Math.random()*WORDS.length)];
+  guessed=new Set();wrong=0;over=false;
+  $("hint").textContent="Hint: "+hint;
+  showScore();
+  $("again").hidden=true;
+  // Re-enable every key and clear its hit/miss styling
+  keys.querySelectorAll("button").forEach(b=>{b.disabled=false;b.className=""});
+  render();
+  $("status").textContent="Pick a letter. You can miss "+MAX+" times.";
+}
+
+// Redraw the word blanks and the hangman figure.
+// If reveal is true (player lost), unguessed letters are shown too, marked red via the "miss" class.
+function render(reveal){
+  $("word").innerHTML=[...word].map(c=>{
+    // Show a letter if it was guessed, or if we're revealing the answer
+    const show=guessed.has(c)||reveal;
+    return `<span class="${show&&!guessed.has(c)?"miss":""}">${show?c:""}</span>`;
+  }).join("");
+  // Show the first `wrong` body parts, hide the rest
+  document.querySelectorAll(".part").forEach((p,i)=>p.classList.toggle("on",i<wrong));
+}
+
+// Handle a guess of letter c (from a button click or the physical keyboard)
+function guess(c){
+  // Ignore input after the game ends or for letters already tried
+  if(over||guessed.has(c))return;
+  guessed.add(c);
+  const hit=word.includes(c);
+  if(!hit)wrong++;
+  // Color the pressed key green/red and disable it
+  const b=keys.querySelector(`[data-k="${c}"]`);
+  b.disabled=true;b.classList.add(hit?"hit":"miss");
+  // Win: every letter of the word has been guessed
+  if([...word].every(l=>guessed.has(l))){end(true)}
+  // Lose: out of allowed misses
+  else if(wrong>=MAX){end(false)}
+  // Otherwise: tell the player how it went and how many misses remain
+  else{$("status").textContent=hit?"Yes, "+c+" is in the word.":(MAX-wrong)+" miss"+(MAX-wrong===1?"":"es")+" left."}
+  // Update the display; reveal the full word only if the game was just lost
+  render(over&&wrong>=MAX);
+}
+
+// Finish the round: update the score, show the result, lock the keyboard, offer a replay
+function end(win){
+  over=true;
+  if(win){
+    streak++;
+    // New record: remember it and save it to the cookie
+    if(streak>best){best=streak;setCookie("hangmanHighScore",best)}
+  }else{
+    // A loss ends the streak (the saved high score is kept)
+    streak=0;
+  }
+  showScore();
+  $("status").textContent=win?"You got it!":"Out of guesses. The word was "+word+".";
+  keys.querySelectorAll("button").forEach(b=>b.disabled=true);
+  // Show "Play again" and move focus to it so Enter/Space restarts quickly
+  $("again").hidden=false;$("again").focus();
+}
+
+$("again").onclick=start;
+
+// Physical keyboard support: any A-Z key makes a guess
+document.addEventListener("keydown",e=>{
+  // Don't hijack browser shortcuts like Ctrl+R or Cmd+C
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  if(/^[a-z]$/i.test(e.key))guess(e.key.toUpperCase());
+});
+
+// Kick off the first round on page load
+start();
+</script>
+<!-- NOTE: the script below is Cloudflare Web Analytics, auto-injected by the host, not part of the game. Left untouched. -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"5f59c1b9b04a4f0ca7b767b3d6cabaac","r":1,"spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>

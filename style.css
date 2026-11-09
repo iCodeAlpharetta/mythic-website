@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Unicase:wght@300;400;500;600;700&display=swap');
+
+body {
+    font-family: 'Cormorant Unicase', serif;
+    background-color: rgb(58, 58, 58);
+ background: url("./ChatGPT\ Image\ Oct\ 12\,\ 2026\,\ 07_21_24\ PM.png")
+ no-repeat;
+ background-size: cover;
+background-position: center;
+}
+
+h1 {
+  color: white;
+  font-weight: bold;
+  text-align: center;
+}
+h2 {
+    color: darkorange;
+    text-align: center;
+    font-size: 39px;
+}
+.description {
+    color: aliceblue;
+    text-align: center;
+    font-size: 25px;
+}
+.columns {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 40px;
+    padding: 0 20px;
+}
+.column {
+    flex: 1 1 300px;
+    max-width: 500px;
+}
+.circle{
+    width: 100px;
+    height: 100px;
+    background-color: aliceblue;
+    border-radius: 50%;
+    border: 7px solid black;
+}
+.button-container{
+    display: flex;
+    gap:10px;
+    justify-content: flex-start;
+}
+.button{
+    display: block;
+    width: fit-content;
+    margin: 20px auto;
+    padding: 12px 32px;
+    font-family: inherit;
+    font-size: 30px;
+    color: white;
+    background-color: darkorange;
+    border: 4px solid black;
+    border-radius: 12px;
+    text-decoration: none;
+    cursor: pointer;
+}
+.button:hover{
+    background-color: orangered;
+}
+@media(max-width: 800px) {
+
+}
+
+img {
+    max-width: 9%;
+    height: auto;
+    padding-left: 250px;
+}
+
+.ooooo {
+    max-width: 9%;
+    height: auto;
+    padding-left: 219px;
+}
+.aaaaa {
+    max-width: 9%;
+    height: auto;
+    padding-left: 465px;
+}
+.eeeee{
+    max-width: 9%;
+    height: auto;
+    padding-left :480px;
+}
